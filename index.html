@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plântula — Compilador de Notas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --verde: #1a4a2e;
+    --verde-claro: #2d7a4f;
+    --verde-bg: #f0f7f2;
+    --verde-borda: #c8e6d4;
+    --amarelo: #e8c547;
+    --texto: #1a2e22;
+    --cinza: #6b7c72;
+    --branco: #fafdf9;
+    --erro: #c0392b;
+    --sucesso: #1a7f37;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--branco);
+    color: var(--texto);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: var(--verde);
+    padding: 28px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  header .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    color: var(--branco);
+    letter-spacing: -0.5px;
+  }
+
+  header .logo span {
+    color: var(--amarelo);
+  }
+
+  header p {
+    color: #a8c9b5;
+    font-size: 14px;
+    font-weight: 300;
+  }
+
+  main {
+    flex: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px;
+    width: 100%;
+  }
+
+  .steps {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 48px;
+    align-items: center;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--cinza);
+    transition: color 0.3s;
+  }
+
+  .step.ativo { color: var(--verde); }
+  .step.concluido { color: var(--verde-claro); }
+
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+
+  .step.ativo .step-num { background: var(--verde); border-color: var(--verde); color: white; }
+  .step.concluido .step-num { background: var(--verde-claro); border-color: var(--verde-claro); color: white; }
+
+  .step-line { flex: 1; height: 2px; background: var(--verde-borda); }
+  .step-line.ativo { background: var(--verde-claro); }
+
+  .card {
+    background: white;
+    border: 1.5px solid var(--verde-borda);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 12px rgba(26,74,46,0.06);
+  }
+
+  .card h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    color: var(--verde);
+    margin-bottom: 8px;
+  }
+
+  .card .desc {
+    color: var(--cinza);
+    font-size: 14px;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  .upload-area {
+    border: 2px dashed var(--verde-borda);
+    border-radius: 12px;
+    padding: 32px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--verde-bg);
+    position: relative;
+  }
+
+  .upload-area:hover, .upload-area.drag { border-color: var(--verde-claro); background: #e4f2ea; }
+  .upload-area.ok { border-color: var(--sucesso); background: #f0fdf4; border-style: solid; }
+  .upload-area.ok .upload-icon { color: var(--sucesso); }
+
+  .upload-icon {
+    font-size: 36px;
+    margin-bottom: 10px;
+    display: block;
+    color: var(--verde-claro);
+  }
+
+  .upload-area h3 { font-size: 15px; font-weight: 600; color: var(--texto); margin-bottom: 4px; }
+  .upload-area p { font-size: 13px; color: var(--cinza); }
+
+  .upload-area input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .file-info {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--sucesso);
+    font-weight: 500;
+  }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    background: var(--verde);
+    color: white;
+    width: 100%;
+    justify-content: center;
+    font-size: 16px;
+    padding: 16px 28px;
+    box-shadow: 0 4px 16px rgba(26,74,46,0.2);
+  }
+
+  .btn-primary:hover { background: var(--verde-claro); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(26,74,46,0.25); }
+  .btn-primary:disabled { background: #9ab5a4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-download {
+    background: var(--amarelo);
+    color: var(--verde);
+    width: 100%;
+    justify-content: center;
+    font-size: 16px;
+    padding: 16px 28px;
+  }
+
+  .btn-download:hover { background: #d4b03e; transform: translateY(-1px); }
+
+  .progress-wrap {
+    background: var(--verde-bg);
+    border-radius: 8px;
+    height: 8px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--verde-claro), var(--verde));
+    border-radius: 8px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .log {
+    background: #f8fbf9;
+    border: 1px solid var(--verde-borda);
+    border-radius: 10px;
+    padding: 16px;
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+
+  .log-item { display: flex; gap: 8px; align-items: flex-start; }
+  .log-item.ok { color: var(--sucesso); }
+  .log-item.err { color: var(--erro); }
+  .log-item.info { color: var(--cinza); }
+  .log-item .dot { flex-shrink: 0; margin-top: 2px; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--verde-bg);
+    color: var(--verde);
+  }
+
+  .result-summary {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    flex: 1;
+    min-width: 120px;
+    background: var(--verde-bg);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .stat .num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 32px;
+    color: var(--verde);
+  }
+
+  .stat .label { font-size: 12px; color: var(--cinza); margin-top: 2px; }
+
+  #secao1, #secao2, #secao3 { display: none; }
+  #secao1 { display: block; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">🌱 plân<span>tula</span></div>
+    <p>Compilador de Notas Fiscais</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step ativo" id="stp1"><div class="step-num">1</div><span>Arquivos</span></div>
+    <div class="step-line" id="line1"></div>
+    <div class="step" id="stp2"><div class="step-num">2</div><span>Processar</span></div>
+    <div class="step-line" id="line2"></div>
+    <div class="step" id="stp3"><div class="step-num">3</div><span>Download</span></div>
+  </div>
+
+  <!-- SEÇÃO 1: Upload -->
+  <div id="secao1">
+    <div class="card">
+      <h2>Envie os arquivos</h2>
+      <p class="desc">Faça upload da planilha de pedidos e dos PDFs das notas fiscais emitidas no Conta Azul.</p>
+
+      <div class="grid2">
+        <!-- Planilha -->
+        <div>
+          <p style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--verde)">📊 Planilha de pedidos (.xlsx)</p>
+          <div class="upload-area" id="areaXlsx">
+            <input type="file" accept=".xlsx,.xls" id="inputXlsx" onchange="onXlsx(this)">
+            <span class="upload-icon">📋</span>
+            <h3>Clique ou arraste aqui</h3>
+            <p>Arquivo .xlsx da planilha de pedidos</p>
+            <div class="file-info hidden" id="infoXlsx"></div>
+          </div>
+        </div>
+
+        <!-- PDFs -->
+        <div>
+          <p style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--verde)">📄 Notas fiscais (PDFs)</p>
+          <div class="upload-area" id="areaPdf">
+            <input type="file" accept=".pdf" multiple id="inputPdf" onchange="onPdfs(this)">
+            <span class="upload-icon">🗂️</span>
+            <h3>Clique ou arraste aqui</h3>
+            <p>Todos os PDFs das NF-es do Conta Azul</p>
+            <div class="file-info hidden" id="infoPdf"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview da ordem -->
+    <div class="card hidden" id="cardPreview">
+      <h2>Ordem de impressão</h2>
+      <p class="desc">Baseado na coluna de rota da planilha. Confira antes de processar.</p>
+      <div id="listaOrdem" style="font-size:13px;line-height:2"></div>
+    </div>
+
+    <button class="btn btn-primary" id="btnProcessar" onclick="iniciarProcessamento()" disabled>
+      ⚙️ Processar e gerar PDF compilado
+    </button>
+  </div>
+
+  <!-- SEÇÃO 2: Progresso -->
+  <div id="secao2">
+    <div class="card">
+      <h2>Processando...</h2>
+      <p class="desc" id="statusMsg">Carimbando as notas e compilando o PDF.</p>
+      <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="log" id="logArea"></div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 3: Download -->
+  <div id="secao3">
+    <div class="card">
+      <h2>✅ PDF pronto!</h2>
+      <p class="desc">O PDF compilado está pronto com todas as notas carimbadas e ordenadas por rota.</p>
+
+      <div class="result-summary" id="resultSummary"></div>
+
+      <button class="btn btn-download" id="btnDownload">
+        ⬇️ Baixar PDF compilado
+      </button>
+
+      <button class="btn" onclick="reiniciar()" style="margin-top:12px;background:var(--verde-bg);color:var(--verde);width:100%;justify-content:center;font-size:14px;padding:12px">
+        🔄 Processar outro lote
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ── Estado ─────────────────────────────────────────────────
+var xlsxFile = null;
+var pdfFiles = [];
+var clientesOrdenados = []; // [{nomeFantasia, ordemRota, cnpj}]
+var pdfFinalBytes = null;
+
+// ── Upload XLSX ─────────────────────────────────────────────
+function onXlsx(input) {
+  if (!input.files.length) return;
+  xlsxFile = input.files[0];
+  document.getElementById('areaXlsx').classList.add('ok');
+  document.getElementById('infoXlsx').textContent = '✓ ' + xlsxFile.name;
+  document.getElementById('infoXlsx').classList.remove('hidden');
+  lerPlanilha();
+}
+
+// ── Upload PDFs ─────────────────────────────────────────────
+function onPdfs(input) {
+  if (!input.files.length) return;
+  pdfFiles = Array.from(input.files);
+  document.getElementById('areaPdf').classList.add('ok');
+  document.getElementById('infoPdf').textContent = '✓ ' + pdfFiles.length + ' PDFs selecionados';
+  document.getElementById('infoPdf').classList.remove('hidden');
+  verificarPronto();
+}
+
+// ── Ler planilha e montar ordem ─────────────────────────────
+function lerPlanilha() {
+  if (!xlsxFile) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+
+      // Encontrar aba mais recente (Pedidos DD/MM)
+      var abaAlvo = null;
+      var melhorData = null;
+      var agora = new Date();
+      var anoAtual = agora.getFullYear();
+
+      wb.SheetNames.forEach(function(nome) {
+        var match = nome.trim().match(/^Pedidos\s+(\d{1,2})\/(\d{1,2})$/i);
+        if (!match) return;
+        var dia = parseInt(match[1]), mes = parseInt(match[2]) - 1;
+        var data = new Date(anoAtual, mes, dia);
+        if (data.getTime() > agora.getTime() + 30 * 24 * 60 * 60 * 1000) {
+          data = new Date(anoAtual - 1, mes, dia);
+        }
+        if (!melhorData || data > melhorData) { melhorData = data; abaAlvo = nome; }
+      });
+
+      if (!abaAlvo) {
+        alert('Nenhuma aba "Pedidos DD/MM" encontrada na planilha!');
+        return;
+      }
+
+      var ws = wb.Sheets[abaAlvo];
+      var dados = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      // Linha 2 (índice 1) = cabeçalhos
+      var headers = dados[1] || [];
+
+      function col(nome) {
+        for (var i = 0; i < headers.length; i++) {
+          if (String(headers[i]).trim().toLowerCase() === nome.toLowerCase()) return i;
+        }
+        return -1;
+      }
+
+      var iNome   = col('Nome fantasia');
+      var iStatus = col('Status');
+      var iTipo   = col('Tipo');
+      var iCNPJ   = col('CNPJ/CPF');
+      var iOrdem  = col('Ordem da rota');
+
+      clientesOrdenados = [];
+
+      for (var r = 2; r < dados.length; r++) {
+        var row = dados[r];
+        var nome   = String(row[iNome]   || '').trim();
+        var status = String(row[iStatus] || '').trim().toLowerCase();
+        var tipo   = String(row[iTipo]   || '').trim().toUpperCase();
+        var cnpj   = String(row[iCNPJ]   || '').trim().replace(/\n/g,'');
+        var ordem  = row[iOrdem];
+
+        if (!nome || status !== 'ativo' || tipo !== 'pj' || !cnpj) continue;
+
+        // Extrair número da rota (ex: "01 - Águas Claras" → 1)
+        var numRota = 9999;
+        if (ordem !== null && ordem !== '') {
+          var m = String(ordem).match(/^(\d+)/);
+          if (m) numRota = parseInt(m[1]);
+        }
+
+        clientesOrdenados.push({
+          nomeFantasia: nome,
+          ordemRota:    numRota,
+          ordemTexto:   String(ordem || ''),
+          cnpj:         cnpj,
+        });
+      }
+
+      // Ordenar pela rota
+      clientesOrdenados.sort(function(a, b) { return a.ordemRota - b.ordemRota; });
+
+      // Mostrar preview
+      var lista = '';
+      clientesOrdenados.forEach(function(c, i) {
+        lista += '<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--verde-borda)">' +
+          '<span style="color:var(--verde);font-weight:600;min-width:28px">' + (i+1) + '</span>' +
+          '<span style="color:var(--cinza);font-size:12px;min-width:120px">' + (c.ordemTexto || '—') + '</span>' +
+          '<span>' + c.nomeFantasia + '</span>' +
+          '</div>';
+      });
+      document.getElementById('listaOrdem').innerHTML = lista;
+      document.getElementById('cardPreview').classList.remove('hidden');
+
+      verificarPronto();
+    } catch(err) {
+      alert('Erro ao ler planilha: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(xlsxFile);
+}
+
+function verificarPronto() {
+  var ok = xlsxFile && pdfFiles.length > 0 && clientesOrdenados.length > 0;
+  document.getElementById('btnProcessar').disabled = !ok;
+}
+
+// ── Processamento ───────────────────────────────────────────
+function mostrarSecao(n) {
+  ['secao1','secao2','secao3'].forEach(function(id) {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById('secao' + n).style.display = 'block';
+}
+
+function atualizarSteps(n) {
+  for (var i = 1; i <= 3; i++) {
+    var el = document.getElementById('stp' + i);
+    el.className = 'step' + (i < n ? ' concluido' : i === n ? ' ativo' : '');
+    if (i < 3) {
+      var line = document.getElementById('line' + i);
+      line.className = 'step-line' + (i < n ? ' ativo' : '');
+    }
+  }
+}
+
+function addLog(msg, tipo) {
+  var log = document.getElementById('logArea');
+  var icons = { ok: '✅', err: '❌', info: '•' };
+  var div = document.createElement('div');
+  div.className = 'log-item ' + (tipo || 'info');
+  div.innerHTML = '<span class="dot">' + (icons[tipo] || '•') + '</span><span>' + msg + '</span>';
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function setProgress(pct) {
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+async function iniciarProcessamento() {
+  mostrarSecao(2);
+  atualizarSteps(2);
+  document.getElementById('logArea').innerHTML = '';
+  setProgress(0);
+
+  try {
+    // 1. Ler todos os PDFs em memória
+    addLog('Lendo ' + pdfFiles.length + ' PDFs...', 'info');
+    var pdfMap = {}; // nome_sem_ext → ArrayBuffer
+    for (var i = 0; i < pdfFiles.length; i++) {
+      var f = pdfFiles[i];
+      var buf = await f.arrayBuffer();
+      var nome = f.name.replace(/\.pdf$/i, '');
+      pdfMap[nome] = buf;
+    }
+    setProgress(15);
+    addLog('PDFs carregados: ' + Object.keys(pdfMap).length, 'ok');
+
+    // 2. Associar PDFs aos clientes
+    // Como o PDF vem com número de série da NF, e não temos esse mapeamento automático,
+    // ordenamos os PDFs pelos seus nomes (numérico) e os clientes pela rota
+    // Assumindo que a quantidade de PDFs = quantidade de clientes
+    var pdfNomes = Object.keys(pdfMap).sort(function(a, b) {
+      var na = parseInt(a) || 0, nb = parseInt(b) || 0;
+      return na - nb;
+    });
+
+    addLog('Associando PDFs aos clientes pela ordem de rota...', 'info');
+
+    // Verificar se quantidades batem
+    if (pdfNomes.length !== clientesOrdenados.length) {
+      addLog('⚠️ Atenção: ' + pdfNomes.length + ' PDFs para ' + clientesOrdenados.length +
+        ' clientes. Usando o que houver.', 'err');
+    }
+
+    var pares = [];
+    var total = Math.min(pdfNomes.length, clientesOrdenados.length);
+    for (var j = 0; j < total; j++) {
+      pares.push({
+        cliente: clientesOrdenados[j],
+        pdfBuf:  pdfMap[pdfNomes[j]],
+        pdfNome: pdfNomes[j],
+      });
+    }
+
+    setProgress(25);
+
+    // 3. Carimbar e compilar
+    addLog('Carimbando notas com nome de fachada...', 'info');
+    var { PDFDocument, rgb, StandardFonts } = PDFLib;
+    var pdfFinal = await PDFDocument.create();
+    var fonte = await pdfFinal.embedFont(StandardFonts.HelveticaBold);
+
+    var erros = 0;
+    for (var k = 0; k < pares.length; k++) {
+      var par = pares[k];
+      setProgress(25 + Math.round((k / pares.length) * 65));
+
+      try {
+        var docOriginal = await PDFDocument.load(par.pdfBuf, { ignoreEncryption: true });
+        var paginas = await pdfFinal.copyPages(docOriginal, docOriginal.getPageIndices());
+
+        paginas.forEach(function(pagina, pi) {
+          var { width, height } = pagina.getSize();
+
+          // Escala: página original tem ~595pt de largura (A4)
+          var escala = width / 595;
+
+          // Texto do carimbo
+          var num = k + 1;
+          var texto = num + ' - ' + par.cliente.nomeFantasia.toUpperCase();
+
+          // Tamanho da fonte ajustado
+          var tamFonte = 13 * escala;
+          var largTexto = fonte.widthOfTextAtSize(texto, tamFonte);
+
+          // Espaço disponível: da borda esquerda até onde começa o bloco NF (~496pt * escala)
+          var xLimite = 496 * escala;
+          if (largTexto > xLimite - 20) {
+            tamFonte = tamFonte * (xLimite - 20) / largTexto;
+            largTexto = fonte.widthOfTextAtSize(texto, tamFonte);
+          }
+
+          // Posição: centro da faixa branca do topo
+          var xCentro = xLimite / 2;
+          var y = height - (10 * escala);
+
+          pagina.drawText(texto, {
+            x:    xCentro - largTexto / 2,
+            y:    y,
+            size: tamFonte,
+            font: fonte,
+            color: rgb(0, 0, 0),
+          });
+
+          pdfFinal.addPage(pagina);
+        });
+
+        addLog('✓ ' + num + '. ' + par.cliente.nomeFantasia + ' ← ' + par.pdfNome + '.pdf', 'ok');
+      } catch(e) {
+        addLog('✗ ' + par.cliente.nomeFantasia + ': ' + e.message, 'err');
+        erros++;
+      }
+    }
+
+    setProgress(95);
+    addLog('Finalizando PDF...', 'info');
+    pdfFinalBytes = await pdfFinal.save();
+    setProgress(100);
+
+    // 4. Resultado
+    var notas = pares.length - erros;
+    document.getElementById('resultSummary').innerHTML =
+      '<div class="stat"><div class="num">' + notas + '</div><div class="label">Notas carimbadas</div></div>' +
+      '<div class="stat"><div class="num">' + pares.length + '</div><div class="label">Total de páginas</div></div>' +
+      (erros > 0 ? '<div class="stat"><div class="num" style="color:var(--erro)">' + erros + '</div><div class="label">Com erro</div></div>' : '');
+
+    // Configurar botão de download
+    document.getElementById('btnDownload').onclick = function() {
+      var blob = new Blob([pdfFinalBytes], { type: 'application/pdf' });
+      var url  = URL.createObjectURL(blob);
+      var a    = document.createElement('a');
+      var hoje = new Date();
+      var dd   = String(hoje.getDate()).padStart(2,'0');
+      var mm   = String(hoje.getMonth()+1).padStart(2,'0');
+      a.href     = url;
+      a.download = 'Notas_Plantula_' + dd + mm + '.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    mostrarSecao(3);
+    atualizarSteps(3);
+
+  } catch(err) {
+    addLog('Erro fatal: ' + err.message, 'err');
+    setProgress(0);
+  }
+}
+
+function reiniciar() {
+  xlsxFile = null;
+  pdfFiles = [];
+  clientesOrdenados = [];
+  pdfFinalBytes = null;
+  document.getElementById('inputXlsx').value = '';
+  document.getElementById('inputPdf').value = '';
+  document.getElementById('areaXlsx').classList.remove('ok');
+  document.getElementById('areaPdf').classList.remove('ok');
+  document.getElementById('infoXlsx').classList.add('hidden');
+  document.getElementById('infoPdf').classList.add('hidden');
+  document.getElementById('cardPreview').classList.add('hidden');
+  document.getElementById('btnProcessar').disabled = true;
+  document.getElementById('logArea').innerHTML = '';
+  mostrarSecao(1);
+  atualizarSteps(1);
+}
+
+// Drag and drop
+['areaXlsx', 'areaPdf'].forEach(function(id) {
+  var el = document.getElementById(id);
+  el.addEventListener('dragover', function(e) { e.preventDefault(); el.classList.add('drag'); });
+  el.addEventListener('dragleave', function() { el.classList.remove('drag'); });
+  el.addEventListener('drop', function(e) {
+    e.preventDefault();
+    el.classList.remove('drag');
+    if (id === 'areaXlsx' && e.dataTransfer.files.length) {
+      document.getElementById('inputXlsx').files = e.dataTransfer.files;
+      onXlsx(document.getElementById('inputXlsx'));
+    } else if (id === 'areaPdf' && e.dataTransfer.files.length) {
+      document.getElementById('inputPdf').files = e.dataTransfer.files;
+      onPdfs(document.getElementById('inputPdf'));
+    }
+  });
+});
+</script>
+</body>
+</html>
