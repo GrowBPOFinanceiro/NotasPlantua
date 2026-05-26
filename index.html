@@ -463,17 +463,28 @@ function lerPlanilha() {
       var iCNPJ   = col('CNPJ/CPF');
       var iOrdem  = col('Ordem da rota');
 
+      // Debug no console do navegador
+      console.log('Aba selecionada:', abaAlvo);
+      console.log('Índices — Nome:', iNome, 'Status:', iStatus, 'Tipo:', iTipo, 'CNPJ:', iCNPJ, 'Ordem:', iOrdem);
+
       clientesOrdenados = [];
 
       for (var r = 2; r < dados.length; r++) {
         var row = dados[r];
+        if (!row || row.length === 0) continue;
+
         var nome   = String(row[iNome]   || '').trim();
         var status = String(row[iStatus] || '').trim().toLowerCase();
         var tipo   = String(row[iTipo]   || '').trim().toUpperCase();
-        var cnpj   = String(row[iCNPJ]   || '').trim().replace(/\n/g,'');
+        var cnpj   = String(row[iCNPJ]   || '').trim().replace(/\n/g,'').replace(/\s/g,'');
         var ordem  = row[iOrdem];
 
-        if (!nome || status !== 'ativo' || tipo !== 'pj' || !cnpj) continue;
+        if (!nome) continue;
+
+        // Aceitar Ativo + PJ (tolerante a variações)
+        if (status !== 'ativo') continue;
+        if (tipo !== 'PJ' && tipo !== 'JURÍDICA' && tipo !== 'JURIDICA') continue;
+        if (!cnpj) continue;
 
         // Extrair número da rota (ex: "01 - Águas Claras" → 1)
         var numRota = 9999;
