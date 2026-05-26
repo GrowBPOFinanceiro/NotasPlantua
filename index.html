@@ -416,14 +416,27 @@ function lerPlanilha() {
       var anoAtual = agora.getFullYear();
 
       wb.SheetNames.forEach(function(nome) {
-        var match = nome.trim().match(/^Pedidos\s+(\d{1,2})\/(\d{1,2})$/i);
+        var n = nome.trim();
+        // Aceita: "Pedidos 26/05", "Pedidos 05_26", "Pedidos 05/26", "Pedidos 26_05"
+        var match =
+          n.match(/^Pedidos\s+(\d{1,2})[\/\-_](\d{1,2})$/i) ||
+          n.match(/^Pedidos\s+(\d{1,2})\s+(\d{1,2})$/i);
         if (!match) return;
-        var dia = parseInt(match[1]), mes = parseInt(match[2]) - 1;
-        var data = new Date(anoAtual, mes, dia);
-        if (data.getTime() > agora.getTime() + 30 * 24 * 60 * 60 * 1000) {
-          data = new Date(anoAtual - 1, mes, dia);
-        }
-        if (!melhorData || data > melhorData) { melhorData = data; abaAlvo = nome; }
+
+        // Tentar as duas interpretações (DD/MM e MM/DD) e pegar a mais recente válida
+        var pares = [
+          { dia: parseInt(match[1]), mes: parseInt(match[2]) - 1 },
+          { dia: parseInt(match[2]), mes: parseInt(match[1]) - 1 },
+        ];
+
+        pares.forEach(function(p) {
+          if (p.dia < 1 || p.dia > 31 || p.mes < 0 || p.mes > 11) return;
+          var data = new Date(anoAtual, p.mes, p.dia);
+          if (data.getTime() > agora.getTime() + 30 * 24 * 60 * 60 * 1000) {
+            data = new Date(anoAtual - 1, p.mes, p.dia);
+          }
+          if (!melhorData || data > melhorData) { melhorData = data; abaAlvo = nome; }
+        });
       });
 
       if (!abaAlvo) {
